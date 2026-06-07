@@ -1,0 +1,93 @@
+name: CI
+
+# Khi nào pipeline chạy
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # ---------- JOB 1: lint + test ----------
+  test:
+    runs-on: ubuntu-latest
+
+    # Một Postgres tạm để test có database mà chạy
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: notesdb
+          POSTGRES_USER: notes
+          POSTGRES_PASSWORD: notes
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U notes -d notesdb"
+          --health-interval 5s --health-timeout 3s --health-retries 5
+
+    # Biến môi trường để app kết nối Postgres ở trên
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: notesdb
+      DB_USER: notes
+      DB_PASSWORD: notes
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r app/requirements.txt
+          pip install ruff pytest
+
+      - name: Lint with ruff
+        run: ruff check app
+
+      - name: Run tests
+        working-directory: app
+        run: pytest -v
+
+  # ---------- JOB 2: build image + scan + push ----------
+  build-and-push:
+    needs: test # chỉ chạy khi job test PASS
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # cần để push lên GHCR
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # GHCR yêu cầu tên ảnh viết thường -> tự hạ chữ thường username
+      - name: Set image name (lowercase)
+        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/devops-capstone-app" >> "$GITHUB_ENV"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        run: docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" ./app
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: "0" # đổi thành "1" sau này để FAIL nếu có lỗ hổng
+
+      - name: Push image
+        run: docker push "$IMAGE" --all-tags
