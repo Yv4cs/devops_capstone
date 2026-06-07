@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevOps Capstone — Notes</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.4rem; }
+    form { display: flex; gap: 8px; margin: 16px 0; }
+    input { flex: 1; padding: 8px; }
+    button { padding: 8px 16px; cursor: pointer; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 8px; }
+    small { color: #888; }
+  </style>
+</head>
+<body>
+  <h1>Notes — DevOps Capstone</h1>
+  <form id="note-form">
+    <input id="content" placeholder="Write a note..." required>
+    <button type="submit">Add</button>
+  </form>
+  <ul id="notes"></ul>
+
+  <script>
+    async function loadNotes() {
+      const res = await fetch('/api/notes');
+      const notes = await res.json();
+      const ul = document.getElementById('notes');
+      ul.innerHTML = '';
+      notes.forEach(n => {
+        const li = document.createElement('li');
+        li.innerHTML = `${n.content}<br><small>#${n.id}</small>`;
+        ul.appendChild(li);
+      });
+    }
+
+    document.getElementById('note-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('content');
+      await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: input.value })
+      });
+      input.value = '';
+      loadNotes();
+    });
+
+    loadNotes();
+  </script>
+</body>
+</html>
