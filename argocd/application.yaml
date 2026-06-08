@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: notes-app
+  namespace: argocd # đối tượng Application sống trong namespace argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Yv4cs/devops_capstone.git # repo của bạn (public)
+    targetRevision: main # nhánh theo dõi
+    path: k8s # thư mục chứa manifest cần deploy
+  destination:
+    server: https://kubernetes.default.svc # chính cluster này
+    namespace: default # deploy vào namespace default (nơi bạn đã apply tay)
+  syncPolicy:
+    automated:
+      prune: true # xóa resource nếu bị gỡ khỏi Git
+      selfHeal: true # ai sửa tay trên cluster -> Argo kéo về đúng như Git
