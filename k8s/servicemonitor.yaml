@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: notes-app
+  namespace: default
+  labels:
+    release: monitoring # BẮT BUỘC: để Prometheus (kube-prometheus-stack) chọn ServiceMonitor này
+spec:
+  selector:
+    matchLabels:
+      app: notes-app # chọn Service có label app=notes-app
+  endpoints:
+    - port: http # đúng TÊN port trên Service
+      path: /metrics
+      interval: 15s # cứ 15s hút metrics một lần

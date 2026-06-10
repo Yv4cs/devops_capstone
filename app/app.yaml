@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notes-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notes-app
+  template:
+    metadata:
+      labels:
+        app: notes-app
+    spec:
+      containers:
+        - name: notes-app
+          image: ghcr.io/yv4cs/devops-capstone-app:latest
+          ports:
+            - containerPort: 5000
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+
+          env:
+            - name: DB_HOST
+              value: postgres # tên Service của Postgres ở trên
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: POSTGRES_DB
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: POSTGRES_PASSWORD
+          readinessProbe: # khi nào pod sẵn sàng nhận traffic
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe: # nếu pod "chết", K8s tự restart
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notes-app
+  labels:
+    app: notes-app # ServiceMonitor sẽ chọn Service theo label này
+spec:
+  selector:
+    app: notes-app
+  ports:
+    - name: http # ServiceMonitor tham chiếu port theo TÊN
+      port: 80 # cổng của Service
+      targetPort: 5000 # cổng container (gunicorn)

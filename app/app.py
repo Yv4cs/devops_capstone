@@ -4,8 +4,20 @@ import time
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask import Flask, request, jsonify, render_template
+from prometheus_flask_exporter import PrometheusMetrics
+from prometheus_client import Counter
 
 app = Flask(__name__)
+
+# Tự phơi GET /metrics và tự đếm MỌI HTTP request
+# (tạo các series flask_http_request_total, _duration_seconds...).
+metrics = PrometheusMetrics(app)
+metrics.info("notes_app_info", "Notes application", version="1.0.0")
+
+# Metric "nghiệp vụ" tự định nghĩa: tổng số note đã tạo thành công.
+notes_created_total = Counter(
+    "notes_created_total", "Total number of notes successfully created"
+)
 
 # Database connection settings come from environment variables.
 # Defaults match docker-compose.yml so it "just works" locally.
@@ -83,6 +95,7 @@ def add_note():
         )
         note = cur.fetchone()
     conn.close()
+    notes_created_total.inc()   # +1 mỗi khi tạo note thành công
     return jsonify(note), 201
 
 
